@@ -17,6 +17,7 @@ from datetime import datetime
 import json
 import os
 import time
+import logging
 
 import endpoints
 from protorpc import messages
@@ -30,6 +31,7 @@ from models import Profile
 from models import ProfileMiniForm
 from models import ProfileForm
 from models import TeeShirtSize
+from utils import getUserId
 
 from settings import WEB_CLIENT_ID
 
@@ -64,24 +66,25 @@ class ConferenceApi(remote.Service):
 
     def _getProfileFromUser(self):
         """Return user Profile from datastore, creating new one if non-existent."""
-        ## TODO 2
-        ## step 1: make sure user is authed
-        ## uncomment the following lines:
+        
         user = endpoints.get_current_user()
         if not user:
             raise endpoints.UnauthorizedException('Authorization required')
-        profile = None
-        ## step 2: create a new Profile from logged in user data
-        ## you can use user.nickname() to get displayName
-        ## and user.email() to get mainEmail
+        user_id = getUserId(user)
+        logging.info("User_id:"+user_id)
+        p_key = ndb.Key(Profile,user_id)
+        logging.info("p_key:{KEY}".format(KEY=p_key))
+        profile = p_key.get()
         if not profile:
             profile = Profile(
-                userId = None,
-                key = None,
+                key = p_key,
                 displayName = user.nickname(), 
                 mainEmail= user.email(),
                 teeShirtSize = str(TeeShirtSize.NOT_SPECIFIED),
             )
+            logging.info("Saving profile")
+            profile.put()
+            logging.info("profile saved")
 
         return profile      # return Profile
 
@@ -100,6 +103,7 @@ class ConferenceApi(remote.Service):
                         setattr(prof, field, str(val))
 
         # return ProfileForm
+            prof.put()
         return self._copyProfileToForm(prof)
 
 
@@ -109,9 +113,7 @@ class ConferenceApi(remote.Service):
         """Return user profile."""
         return self._doProfile()
 
-    # TODO 1
-    # 1. change request class
-    # 2. pass request to _doProfile function
+
     @endpoints.method(ProfileMiniForm, ProfileForm,
             path='profile', http_method='POST', name='saveProfile')
     def saveProfile(self, request):
